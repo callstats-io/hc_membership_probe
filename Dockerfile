@@ -10,5 +10,6 @@ RUN sbt update
 COPY ./src ./src
 RUN sbt compile
 
-ENTRYPOINT ["sbt", "run"]
+
+CMD ["sbt", "-J-Xms128m", "-J-Xmx384m","run"]
 
