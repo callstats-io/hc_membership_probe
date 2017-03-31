@@ -7,7 +7,6 @@ import scala.collection.JavaConverters._
 
 import org.glassfish.jersey.jackson.JacksonFeature
 import org.glassfish.jersey.jetty.JettyHttpContainerFactory
-import org.glassfish.jersey.server.JSONP
 import org.glassfish.jersey.server.ResourceConfig
 
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -61,7 +60,6 @@ class HcStatusProbe {
   }
 
   @GET
-  @JSONP
   @Path("clusterinfo")
   @Produces(Array(MediaType.APPLICATION_JSON))
   def getMemberStatus = {
@@ -113,6 +111,7 @@ object HcProbe {
     if (!hcClusterAddrEnv.isDefined) {
       sys.error("environment variable HC_ADDRS not set!")
       sys.exit(-1)
+      return
     }
 
     var clusterAddrs = hcClusterAddrEnv.get.split(",")
