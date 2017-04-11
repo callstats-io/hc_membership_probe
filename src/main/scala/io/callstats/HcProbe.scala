@@ -1,9 +1,15 @@
 package io.callstats
 
 import java.util.Date
+import java.util.concurrent.Callable
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.FutureTask
+import java.util.concurrent.TimeUnit
 
 import scala.beans.BeanProperty
-import scala.collection.JavaConverters._
+import scala.collection.JavaConverters.asScalaSetConverter
+import scala.collection.JavaConverters.seqAsJavaListConverter
 
 import org.glassfish.jersey.jackson.JacksonFeature
 import org.glassfish.jersey.jetty.JettyHttpContainerFactory
@@ -38,14 +44,56 @@ object HcStatusProbe {
   var hcClient: Option[HazelcastInstance] = None
   var clusterAddres: Array[String] = _
 
+  var executor: ExecutorService = Executors.newFixedThreadPool(1)
+
+  // reconnect a lost connection, and wait for it to be setup!
+  // only one thread shall enter this to avoid creating multiple connections because of multi-threading.
+  def reConnectClient(): Unit = synchronized {
+
+    if (HcStatusProbe.hcClient.get.getLifecycleService().isRunning()) return
+
+    val future = new FutureTask[Unit](new Callable[Unit]() {
+      def call(): Unit = {
+        logger.info(s"reconnecting to connection to hazelcast ${HcStatusProbe.this.clusterAddres}")
+
+        var clientConfig = new ClientConfig();
+        clientConfig.getNetworkConfig().addAddress(HcStatusProbe.this.clusterAddres: _*)
+        hcClient = Some(HazelcastClient.newHazelcastClient(clientConfig))
+      }
+    })
+
+    executor.execute(future)
+    future.get(30, TimeUnit.SECONDS)
+
+  }
+
+  // initial creation of the HC client
   def createClient(clusterAddrs: Array[String]): Unit = {
     this.clusterAddres = clusterAddrs
-    var clientConfig = new ClientConfig();
 
-    logger.info(s"connecting to hazelcast $clusterAddres")
-    clientConfig.getNetworkConfig().addAddress(clusterAddrs: _*)
+    val future = new FutureTask[Unit](new Callable[Unit]() {
+      def call(): Unit = {
+        logger.info(s"initial connection to hazelcast ${HcStatusProbe.this.clusterAddres}")
 
-    hcClient = Some(HazelcastClient.newHazelcastClient(clientConfig))
+        // try until a connection is setup!
+        do {
+          try {
+            var clientConfig = new ClientConfig();
+            clientConfig.getNetworkConfig().addAddress(clusterAddrs: _*)
+            hcClient = Some(HazelcastClient.newHazelcastClient(clientConfig))
+          } catch {
+            case ex: Exception => {
+              logger.error(s"Meet error connecting to HC: $ex")
+            }
+          }
+
+        } while (!hcClient.isDefined)
+
+      }
+    })
+
+    executor.execute(future)
+
   }
 
 }
@@ -78,16 +126,21 @@ class HcStatusProbe {
   @GET
   @Path("members")
   def getMembers(@Context uriInfo: UriInfo): Response = {
+    if (!HcStatusProbe.hcClient.isDefined) {
+      HcStatusProbe.logger.error("hazelcast client is not created yet!")
+      return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build()
+    }
+
     if (!HcStatusProbe.hcClient.get.getLifecycleService().isRunning()) {
       HcStatusProbe.logger.error("hazelcast client is not connected. Let's create a new connection!");
-      HcStatusProbe.createClient(HcStatusProbe.clusterAddres)
+      HcStatusProbe.reConnectClient()
     }
 
     val clusterInfo = HcStatusProbe.hcClient.get.getCluster
     var memberList = clusterInfo.getMembers().asScala.map(member => HCMember(member.getUuid, member.getSocketAddress().toString())).toList
 
     HcStatusProbe.logger.info(s"cluster has ${memberList.size} members")
-    
+
     val jsonStr = HcStatusProbe.mapper.writeValueAsString(memberList);
 
     val gteParams = Option(uriInfo.getQueryParameters.getFirst("gte"))
@@ -105,7 +158,7 @@ object HcProbe {
 
   def main(args: Array[String]): Unit = {
 
-    // the "HC_ADDRS" can be comma separated 'ip:port' tuples indicate the hazelcast node addresses
+    // the "HC_ADDRS" can be comma separated 'ip:port' tuples representing the hazelcast node addresses
     // if it is not defined, we'll just crash
     var hcClusterAddrEnv = sys.env.get("HC_ADDRS")
     if (!hcClusterAddrEnv.isDefined) {
