@@ -4,14 +4,17 @@ services:
     build: .
     ports:
       - "5678:8080"
-    links:
-      - hazelcast
     environment:
       - HC_ADDRS=hazelcast:5701
       - LISTEN_ADDR=127.0.0.1:8080
     working_dir: /code
+    networks:
+      - integrationtest
 
   hazelcast:
     image: hazelcast/hazelcast:3.7.6
+    networks:
+      - integrationtest
 
-
+networks:
+  integrationtest: {}
