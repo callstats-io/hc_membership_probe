@@ -30,8 +30,45 @@ import javax.ws.rs.core.MediaType
 import javax.ws.rs.core.Response
 import javax.ws.rs.core.UriBuilder
 import javax.ws.rs.core.UriInfo
+import com.hazelcast.core.MembershipListener
+import com.hazelcast.core.LifecycleListener
+import com.hazelcast.core.LifecycleEvent
+import org.slf4j.LoggerFactory
+import com.hazelcast.core.MembershipEvent
+import com.hazelcast.core.MemberAttributeEvent
+import com.hazelcast.cluster.ClusterState
 
 case class HCMember(@BeanProperty uuID: String, @BeanProperty address: String)
+
+class LifecycleListenerImpl extends LifecycleListener {
+  val logger = Logger(classOf[LifecycleListenerImpl])
+
+  def stateChanged(event: LifecycleEvent) = {
+    logger.info("LifecycleEvent with new state: " + event.getState());
+  }
+
+}
+
+/**
+ * A listener to log the membership status as seen by ConfManager
+ */
+class MembershipListenerImpl extends MembershipListener {
+  val logger = Logger(classOf[MembershipListenerImpl])
+
+  def memberAdded(membershipEvent: MembershipEvent): Unit = {
+    logger.info(membershipEvent.toString());
+  }
+
+  def memberRemoved(membershipEvent: MembershipEvent): Unit = {
+    logger.info(membershipEvent.toString());
+  }
+
+  def memberAttributeChanged(memberAttributeEvent: MemberAttributeEvent): Unit = {
+    // TODO Auto-generated method stub
+  }
+
+}
+
 
 object HcStatusProbe {
 
@@ -59,6 +96,9 @@ object HcStatusProbe {
         var clientConfig = new ClientConfig();
         clientConfig.getNetworkConfig().addAddress(HcStatusProbe.this.clusterAddres: _*)
         hcClient = Some(HazelcastClient.newHazelcastClient(clientConfig))
+
+        hcClient.get.getCluster().addMembershipListener(new MembershipListenerImpl())
+
       }
     })
 
@@ -81,6 +121,9 @@ object HcStatusProbe {
             var clientConfig = new ClientConfig();
             clientConfig.getNetworkConfig().addAddress(clusterAddrs: _*)
             hcClient = Some(HazelcastClient.newHazelcastClient(clientConfig))
+
+            hcClient.get.getCluster().addMembershipListener(new MembershipListenerImpl())
+
           } catch {
             case ex: Exception => {
               logger.error(s"Meet error connecting to HC: $ex")
@@ -100,11 +143,25 @@ object HcStatusProbe {
 
 @Path("/hc")
 class HcStatusProbe {
+  val logger = Logger(classOf[HcStatusProbe])
 
   @GET
   @Path("ping")
   def getServerTime(): String = {
     "received ping at " + new Date().toString()
+  }
+
+  @GET
+  @Path("clusterstate")
+  def getClusterState(): Response = {
+    val clusterState: ClusterState = HcStatusProbe.hcClient.get.getCluster.getClusterState()
+    logger.info(s"clusterstate: $clusterState")
+
+    if (clusterState == ClusterState.ACTIVE) {
+      return Response.ok.entity(clusterState.toString()).build()
+    } else {
+      return Response.serverError().entity(clusterState.toString()).build()
+    }
   }
 
   @GET

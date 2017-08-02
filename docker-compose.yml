@@ -8,11 +8,23 @@ services:
       - HC_ADDRS=hazelcast:5701
       - LISTEN_ADDR=127.0.0.1:8080
     working_dir: /code
+    depends_on:
+      - hazelcast
     networks:
       - integrationtest
 
   hazelcast:
     image: hazelcast/hazelcast:3.7.6
+    networks:
+      - integrationtest
+
+  #hazelcast python client
+  hcpc:
+    build:
+      context: ./
+      dockerfile: Dockerfile-hcpc
+    depends_on:
+      - hazelcast
     networks:
       - integrationtest
 
