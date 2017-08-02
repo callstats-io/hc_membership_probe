@@ -24,8 +24,8 @@ libraryDependencies += "org.glassfish.jersey.media" % "jersey-media-json-jackson
 libraryDependencies += "com.fasterxml.jackson.module" % "jackson-module-scala_2.11" % "2.8.7"
 
 // hazelcast client
-libraryDependencies += "com.hazelcast" % "hazelcast-client" % "3.7.6"
-
+// https://mvnrepository.com/artifact/com.hazelcast/hazelcast-client
+libraryDependencies += "com.hazelcast" % "hazelcast-client" % "3.8.3"
 
 // logging related
 libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0"
