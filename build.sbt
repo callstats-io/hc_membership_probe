@@ -23,9 +23,12 @@ libraryDependencies += "org.glassfish.jersey.media" % "jersey-media-json-jackson
 // https://mvnrepository.com/artifact/com.fasterxml.jackson.module/jackson-module-scala_2.11
 libraryDependencies += "com.fasterxml.jackson.module" % "jackson-module-scala_2.11" % "2.8.7"
 
-// hazelcast client
-libraryDependencies += "com.hazelcast" % "hazelcast-client" % "3.7.6"
+// https://mvnrepository.com/artifact/org.json4s/json4s-jackson_2.11
+libraryDependencies += "org.json4s" % "json4s-jackson_2.11" % "3.5.3"
 
+// hazelcast client
+// https://mvnrepository.com/artifact/com.hazelcast/hazelcast-client
+libraryDependencies += "com.hazelcast" % "hazelcast-client" % "3.8.3"
 
 // logging related
 libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0"
@@ -33,3 +36,6 @@ libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.2"
 libraryDependencies += "ch.qos.logback" % "logback-core" % "1.2.2"
 libraryDependencies += "net.logstash.logback" % "logstash-logback-encoder" % "4.9"
 libraryDependencies += "com.fasterxml.jackson.core" % "jackson-core" % "2.8.6"
+
+// scalaj.http
+libraryDependencies +=  "org.scalaj" %% "scalaj-http" % "2.3.0"
